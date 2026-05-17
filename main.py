@@ -1,50 +1,37 @@
+import os
 import datetime
-from telegram import (
-    Update, InlineKeyboardButton, InlineKeyboardMarkup
-)
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
-    ApplicationBuilder, Application, CommandHandler,
-    CallbackQueryHandler, MessageHandler,
-    ContextTypes, filters
+    Application,
+    CommandHandler,
+    CallbackQueryHandler,
+    MessageHandler,
+    ContextTypes,
+    filters,
 )
 
-# ============================================================
-# BOT CONFIG
-# ============================================================
-TOKEN = "8677546019:AAFWKxg0BBmv3UQ9W8443tX9kYSYy0c549E"
-CHANNEL = "@niftypulse2411"
+# ===================== CONFIG =====================
+TOKEN = os.getenv("8677546019:AAEyhPOBvbHf5zvWgAk9fngnRL86GrukwRk")
+CHANNEL = os.getenv("CHANNEL", "@niftypulse2411")
+ADMIN_ID = int(os.getenv("ADMIN_ID", "0"))
 
-ADMIN_ID = 1797446047    # Only admin can use bot
-
-
-# ============================================================
-# STORAGE
-# ============================================================
+# ===================== STORAGE =====================
 weekly_updates = {
-    1: {"photo": None, "text": None, "url": None},
-    2: {"photo": None, "text": None, "url": None},
-    3: {"photo": None, "text": None, "url": None},
-    4: {"photo": None, "text": None, "url": None},
-    5: {"photo": None, "text": None, "url": None},
+    i: {"photo": None, "text": None, "url": None}
+    for i in range(1, 6)
 }
 
-user_state = {}   # Tracks admin operations
+user_state = {}
 
-
-# ============================================================
-# ADMIN CHECK
-# ============================================================
+# ===================== HELPERS =====================
 def is_admin(user_id: int):
     return user_id == ADMIN_ID
 
 
-# ============================================================
-# START COMMAND
-# ============================================================
+# ===================== START =====================
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-
-    if not is_admin(update.message.from_user.id):
-        await update.message.reply_text("❌ You are not authorized to use this bot.")
+    if not is_admin(update.effective_user.id):
+        await update.message.reply_text("❌ Not authorized")
         return
 
     keyboard = [
@@ -52,123 +39,121 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     ]
 
     await update.message.reply_text(
-        "🤖 Welcome to Auto Posting Bot!\n\n"
-        "Manage weekly auto-post updates easily.\n"
-        "Choose an option below 👇",
+        "🤖 Auto Posting Bot\nSelect option:",
         reply_markup=InlineKeyboardMarkup(keyboard),
     )
 
 
-# ============================================================
-# WEEKLY MENU
-# ============================================================
-async def weekly(update, context):
+# ===================== WEEKLY MENU =====================
+async def weekly(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
 
     keyboard = [
-        [InlineKeyboardButton("📝 Post 1", callback_data="edit_1")],
-        [InlineKeyboardButton("📝 Post 2", callback_data="edit_2")],
-        [InlineKeyboardButton("📝 Post 3", callback_data="edit_3")],
-        [InlineKeyboardButton("📝 Post 4", callback_data="edit_4")],
-        [InlineKeyboardButton("📝 Post 5", callback_data="edit_5")],
-        [InlineKeyboardButton("⬅️ Back", callback_data="start_menu")]
+        [InlineKeyboardButton(f"📝 Post {i}", callback_data=f"edit_{i}")]
+        for i in range(1, 6)
     ]
+    keyboard.append([InlineKeyboardButton("⬅ Back", callback_data="start")])
 
     await query.edit_message_text(
-        "Select a post to update 👇",
+        "Select post:",
         reply_markup=InlineKeyboardMarkup(keyboard),
     )
 
 
-# ============================================================
-# POST EDIT MENU
-# ============================================================
-async def edit_post(update, context):
+# ===================== EDIT MENU =====================
+async def edit_post(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
-    post_id = int(query.data.split("_")[1])
+    await query.answer()
 
+    post_id = int(query.data.split("_")[1])
     context.user_data["post_id"] = post_id
 
     keyboard = [
-        [InlineKeyboardButton("🖼 Upload Photo", callback_data="add_photo")],
-        [InlineKeyboardButton("✏️ Add Text", callback_data="add_text")],
-        [InlineKeyboardButton("🔗 Add URL", callback_data="add_url")],
-        [InlineKeyboardButton("➡ Next Post", callback_data=f"edit_{post_id+1}" if post_id < 5 else "weekly")],
+        [InlineKeyboardButton("🖼 Photo", callback_data="add_photo")],
+        [InlineKeyboardButton("✏ Text", callback_data="add_text")],
+        [InlineKeyboardButton("🔗 URL", callback_data="add_url")],
         [InlineKeyboardButton("⬅ Back", callback_data="weekly")],
     ]
 
     await query.edit_message_text(
-        f"Editing Weekly Post {post_id}\nChoose an option:",
+        f"Editing Post {post_id}",
         reply_markup=InlineKeyboardMarkup(keyboard),
     )
 
 
-# ============================================================
-# BUTTON HANDLER
-# ============================================================
-async def button_handler(update, context):
+# ===================== BUTTON HANDLER =====================
+async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
+    await query.answer()
+
     uid = query.from_user.id
 
     if not is_admin(uid):
-        await query.answer("Not allowed!", show_alert=True)
+        await query.answer("Not allowed", show_alert=True)
         return
 
-    post_id = context.user_data.get("post_id")
+    if "post_id" not in context.user_data:
+        await query.edit_message_text("⚠ Select post first")
+        return
 
     if query.data == "add_photo":
         user_state[uid] = "photo"
-        await query.edit_message_text("📸 Send the photo…")
+        await query.edit_message_text("📸 Send photo")
 
     elif query.data == "add_text":
         user_state[uid] = "text"
-        await query.edit_message_text("✏️ Send the text…")
+        await query.edit_message_text("✏ Send text")
 
     elif query.data == "add_url":
         user_state[uid] = "url"
-        await query.edit_message_text("🔗 Send the URL…")
+        await query.edit_message_text("🔗 Send URL")
 
 
-# ============================================================
-# SAVE USER INPUT
-# ============================================================
-async def save_input(update, context):
-    uid = update.message.from_user.id
+# ===================== SAVE INPUT =====================
+async def save_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    uid = update.effective_user.id
+
+    if not is_admin(uid):
+        return
 
     if uid not in user_state:
         return
 
-    post_id = context.user_data.get("post_id")
+    if "post_id" not in context.user_data:
+        return
+
+    post_id = context.user_data["post_id"]
     mode = user_state[uid]
+
+    text = update.message.text
 
     if mode == "photo" and update.message.photo:
         weekly_updates[post_id]["photo"] = update.message.photo[-1].file_id
-        await update.message.reply_text("✅ Photo saved!")
+        await update.message.reply_text("✅ Photo saved")
 
-    elif mode == "text":
-        weekly_updates[post_id]["text"] = update.message.text
-        await update.message.reply_text("✅ Text saved!")
+    elif mode == "text" and text:
+        weekly_updates[post_id]["text"] = text
+        await update.message.reply_text("✅ Text saved")
 
-    elif mode == "url":
-        weekly_updates[post_id]["url"] = update.message.text
-        await update.message.reply_text("✅ URL saved!")
+    elif mode == "url" and text:
+        weekly_updates[post_id]["url"] = text
+        await update.message.reply_text("✅ URL saved")
 
-    del user_state[uid]
+    user_state.pop(uid, None)
 
 
-# ============================================================
-# AUTO POSTING FUNCTION
-# ============================================================
-async def auto_post(context):
+# ===================== AUTO POST =====================
+async def auto_post(context: ContextTypes.DEFAULT_TYPE):
     post_num = context.job.data
-    data = weekly_updates[post_num]
+    data = weekly_updates.get(post_num)
+
+    if not data:
+        return
 
     caption = ""
-
     if data["text"]:
         caption += data["text"] + "\n"
-
     if data["url"]:
         caption += "\n🔗 " + data["url"]
 
@@ -176,57 +161,48 @@ async def auto_post(context):
         await context.bot.send_photo(
             chat_id=CHANNEL,
             photo=data["photo"],
-            caption=caption if caption else None
+            caption=caption or None,
         )
     else:
         await context.bot.send_message(
             chat_id=CHANNEL,
-            text=caption if caption else f"Post {post_num}"
+            text=caption or f"Post {post_num}",
         )
 
 
-# ============================================================
-# SHOW TIME COMMAND
-# ============================================================
-async def show_times(update, context):
+# ===================== SHOW TIME =====================
+async def show_times(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
-        "🕒 Fixed Posting Times:\n\n"
-        "1️⃣ 8:00 AM\n"
-        "2️⃣ 10:00 AM\n"
-        "3️⃣ 12:00 PM\n"
-        "4️⃣ 2:00 PM\n"
-        "5️⃣ 8:00 PM"
+        "🕒 Schedule:\n"
+        "1️⃣ 8 AM\n2️⃣ 10 AM\n3️⃣ 12 PM\n4️⃣ 2 PM\n5️⃣ 8 PM"
     )
 
 
-# ============================================================
-# MAIN APPLICATION
-# ============================================================
+# ===================== MAIN =====================
 def main():
+    if not TOKEN:
+        raise ValueError("BOT_TOKEN missing")
+
     app = Application.builder().token(TOKEN).build()
 
-    jq = app.job_queue
+    job = app.job_queue
 
-    # Scheduled auto post times
-    jq.run_daily(auto_post, time=datetime.time(8, 0), data=1)
-    jq.run_daily(auto_post, time=datetime.time(10, 0), data=2)
-    jq.run_daily(auto_post, time=datetime.time(12, 0), data=3)
-    jq.run_daily(auto_post, time=datetime.time(14, 0), data=4)
-    jq.run_daily(auto_post, time=datetime.time(20, 0), data=5)
+    job.run_daily(auto_post, time=datetime.time(8, 0), data=1)
+    job.run_daily(auto_post, time=datetime.time(10, 0), data=2)
+    job.run_daily(auto_post, time=datetime.time(12, 0), data=3)
+    job.run_daily(auto_post, time=datetime.time(14, 0), data=4)
+    job.run_daily(auto_post, time=datetime.time(20, 0), data=5)
 
-    # Commands
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("show_times", show_times))
 
-    # Callback handlers
     app.add_handler(CallbackQueryHandler(weekly, pattern="weekly"))
     app.add_handler(CallbackQueryHandler(edit_post, pattern="edit_"))
     app.add_handler(CallbackQueryHandler(button_handler, pattern="add_"))
 
-    # Messages
-    app.add_handler(MessageHandler(filters.ALL, save_input))
+    app.add_handler(MessageHandler(filters.TEXT | filters.PHOTO, save_input))
 
-    print("🚀 Bot Running on Render…")
+    print("Bot running...")
     app.run_polling()
 
 
