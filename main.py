@@ -11,7 +11,7 @@ from telegram.ext import (
 )
 
 # ===================== CONFIG =====================
-TOKEN = os.getenv("8677546019:AAEyhPOBvbHf5zvWgAk9fngnRL86GrukwRk")
+TOKEN = os.getenv("BOT_TOKEN")
 CHANNEL = os.getenv("CHANNEL", "@niftypulse2411")
 ADMIN_ID = int(os.getenv("ADMIN_ID", "0"))
 
