@@ -3,7 +3,7 @@ from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 from datetime import datetime
 
-BOT_TOKEN = "YOUR_BOT_TOKEN_HERE"
+BOT_TOKEN = "8677546019:AAFWKxg0BBmv3UQ9W8443tX9kYSYy0c549E"
 CHANNEL = "@niftypulse2411"
 
 logging.basicConfig(level=logging.INFO)
